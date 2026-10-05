@@ -43,7 +43,7 @@ h2{font-size:1.1rem;margin:0 0 12px;font-weight:700}
 section{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:20px;margin-bottom:18px}
 .settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
 label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:4px;font-weight:600}
-input[type=month],input[type=date],input[type=number]{width:100%;padding:8px 10px;font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:4px}
+select,input[type=date],input[type=number]{width:100%;padding:8px 10px;font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:4px}
 .ceiling-line{margin-top:14px;font-size:.95rem;color:var(--muted)}
 .ceiling-line b{color:var(--ink)}
 .drop{border:2px dashed var(--rule);border-radius:6px;padding:34px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
@@ -98,7 +98,8 @@ footer{color:var(--muted);font-size:.85rem;margin-top:28px;max-width:75ch}
   <section aria-labelledby="s-set">
     <h2 id="s-set">Wage month and ceiling</h2>
     <div class="settings">
-      <div><label for="month">Wage month</label><input type="month" id="month" value="2026-09"></div>
+      <div><label for="mon">Wage month</label><select id="mon"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9" selected>September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></div>
+      <div><label for="yr">Wage year</label><select id="yr"><option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option><option value="2028">2028</option><option value="2029">2029</option><option value="2030">2030</option><option value="2031">2031</option></select></div>
       <div><label for="eff">New ceiling effective from</label><input type="date" id="eff" value="2026-09-17"></div>
       <div><label for="oldc">Old ceiling (₹)</label><input type="number" id="oldc" value="15000" min="0"></div>
       <div><label for="newc">New ceiling (₹)</label><input type="number" id="newc" value="25000" min="0"></div>
@@ -160,7 +161,7 @@ footer{color:var(--muted);font-size:.85rem;margin-top:28px;max-width:75ch}
   }
 
   function settings(){
-    const [y,m] = ($("month").value || "2026-09").split("-").map(Number);
+    const y = Number($("yr").value), m = Number($("mon").value);
     const start = Date.UTC(y, m-1, 1);
     const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
     const effParts = ($("eff").value || "2026-09-17").split("-").map(Number);
@@ -199,7 +200,7 @@ footer{color:var(--muted);font-size:.85rem;margin-top:28px;max-width:75ch}
         const st = wb.Sheets["Settings"];
         if (st){
           const v = a => st[a] ? st[a].v : null;
-          if (typeof v("B5")==="number"){ const d = XLSX.SSF.parse_date_code(v("B5")); $("month").value = `${d.y}-${String(d.m).padStart(2,"0")}`; }
+          if (typeof v("B5")==="number"){ const d = XLSX.SSF.parse_date_code(v("B5")); $("mon").value = String(d.m); if (![...$("yr").options].some(o=>o.value==String(d.y))) $("yr").add(new Option(d.y,d.y)); $("yr").value = String(d.y); }
           if (typeof v("B8")==="number"){ const d = XLSX.SSF.parse_date_code(v("B8")); $("eff").value = `${d.y}-${String(d.m).padStart(2,"0")}-${String(d.d).padStart(2,"0")}`; }
           if (typeof v("B6")==="number") $("oldc").value = v("B6");
           if (typeof v("B7")==="number") $("newc").value = v("B7");
@@ -372,7 +373,7 @@ footer{color:var(--muted);font-size:.85rem;margin-top:28px;max-width:75ch}
     catch(e){ $("actStatus").textContent = "Copy was blocked by the browser – use Download ECR .txt."; }
   });
 
-  ["month","eff","oldc","newc"].forEach(id => $(id).addEventListener("input", () => { showCeiling(); run(); }));
+  ["mon","yr","eff","oldc","newc"].forEach(id => ["input","change"].forEach(ev => $(id).addEventListener(ev, () => { showCeiling(); run(); })));
   showCeiling();
 })();
 </script>
