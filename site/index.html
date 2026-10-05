@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ECR Text Generator – ₹25,000 ceiling</title>
+<meta name="description" content="Generate EPFO ECR text files with the ₹25,000 wage ceiling (w.e.f. 17.09.2026), including the September 2026 pro-rata split.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧾</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="vendor/xlsx.full.min.js"></script>
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --paper:#EEF2F5; --sheet:#FFFFFF; --ink:#17233B; --muted:#5B6878;
+  --rule:#C9D3DC; --ok:#1E6B52; --okbg:#E3F1EB; --err:#B3261E; --errbg:#FBE9E7;
+  --accent:#2C4F8C; --sep:#B3261E; --warnbg:#FFF4D6; --warn:#7A5600;
+  --sans:"Source Sans 3",-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:"JetBrains Mono",Consolas,"Courier New",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#121821; --sheet:#1A222E; --ink:#E4E9F0; --muted:#9AA6B5;
+    --rule:#2E3A4A; --ok:#5FC79E; --okbg:#173328; --err:#F28B82; --errbg:#3A1C1A;
+    --accent:#8EB1EC; --sep:#F28B82; --warnbg:#3A3115; --warn:#F2C661;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#121821; --sheet:#1A222E; --ink:#E4E9F0; --muted:#9AA6B5;
+  --rule:#2E3A4A; --ok:#5FC79E; --okbg:#173328; --err:#F28B82; --errbg:#3A1C1A;
+  --accent:#8EB1EC; --sep:#F28B82; --warnbg:#3A3115; --warn:#F2C661;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5}
+main{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
+h1{font-size:1.75rem;line-height:1.2;margin:0 0 4px;font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:0 0 24px;max-width:70ch}
+h2{font-size:1.1rem;margin:0 0 12px;font-weight:700}
+section{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:20px;margin-bottom:18px}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:4px;font-weight:600}
+input[type=month],input[type=date],input[type=number]{width:100%;padding:8px 10px;font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:4px}
+.ceiling-line{margin-top:14px;font-size:.95rem;color:var(--muted)}
+.ceiling-line b{color:var(--ink)}
+.drop{border:2px dashed var(--rule);border-radius:6px;padding:34px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--paper)}
+.drop p{margin:4px 0}
+.drop .big{font-size:1.15rem;font-weight:600}
+.drop small{color:var(--muted)}
+button{font:inherit;font-weight:600;border-radius:4px;padding:10px 18px;cursor:pointer;border:1px solid var(--accent)}
+button.primary{background:var(--accent);color:var(--sheet)}
+button.ghost{background:transparent;color:var(--accent)}
+button:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.status{margin-top:10px;font-size:.95rem}
+.hidden{display:none !important}
+.notice{padding:12px 14px;border-radius:4px;margin-bottom:12px;font-size:.95rem}
+.notice.err{background:var(--errbg);color:var(--err)}
+.notice.ok{background:var(--okbg);color:var(--ok)}
+.notice.warn{background:var(--warnbg);color:var(--warn)}
+.notice label{display:inline;color:inherit;font-weight:600}
+.challan{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0;border-top:1px solid var(--rule)}
+.challan div{padding:10px 4px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;gap:10px}
+.challan span{color:var(--muted)}
+.challan b{font-variant-numeric:tabular-nums}
+.challan .total{grid-column:1/-1;font-size:1.1rem}
+.challan .total span{color:var(--ink);font-weight:700}
+.wrap{overflow-x:auto;max-height:440px;overflow-y:auto;border:1px solid var(--rule);border-radius:4px}
+table{border-collapse:collapse;width:100%;font-size:.88rem;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;border-bottom:1px solid var(--rule);white-space:nowrap;text-align:right}
+th{position:sticky;top:0;background:var(--sheet);font-weight:700;text-align:right;z-index:1}
+td.l,th.l{text-align:left}
+tr.bad td{background:var(--errbg)}
+td.chk{color:var(--ok);text-align:left}
+tr.bad td.chk{color:var(--err);font-weight:600}
+.ecr{font-family:var(--mono);font-size:.82rem;line-height:1.7;background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:12px;overflow-x:auto;white-space:pre;max-height:260px;overflow-y:auto}
+.ecr i{font-style:normal;color:var(--sep);font-weight:500}
+.foot{color:var(--muted);font-size:.85rem;margin-top:8px}
+nav.top{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:18px;font-size:.95rem}
+nav.top a,footer a{color:var(--accent);font-weight:600;text-decoration:none}
+nav.top a:hover{text-decoration:underline}
+footer{color:var(--muted);font-size:.85rem;margin-top:28px;max-width:75ch}
+@media (max-width:600px){main{padding:18px 14px 40px}h1{font-size:1.4rem}section{padding:16px}}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+<main>
+  <nav class="top"><a href="https://epf-dashboard.online">← All EPF tools</a><a href="files/ECR_Template_25000_Ceiling.xlsx" download>Download blank Excel template</a></nav>
+  <h1>ECR text generator</h1>
+  <p class="sub">Upload the filled ECR template (or any ECR Excel with UAN, name, gross and PF wages). The ₹15,000 → ₹25,000 ceiling split is applied and the ECR .txt is ready to upload on the Unified Portal.</p>
+
+  <section aria-labelledby="s-set">
+    <h2 id="s-set">Wage month and ceiling</h2>
+    <div class="settings">
+      <div><label for="month">Wage month</label><input type="month" id="month" value="2026-09"></div>
+      <div><label for="eff">New ceiling effective from</label><input type="date" id="eff" value="2026-09-17"></div>
+      <div><label for="oldc">Old ceiling (₹)</label><input type="number" id="oldc" value="15000" min="0"></div>
+      <div><label for="newc">New ceiling (₹)</label><input type="number" id="newc" value="25000" min="0"></div>
+    </div>
+    <p class="ceiling-line" id="ceilingLine"></p>
+  </section>
+
+  <section aria-labelledby="s-up">
+    <h2 id="s-up">Excel file</h2>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose Excel file">
+      <p class="big">Drop the Excel file here, or click to choose</p>
+      <p><small>.xlsx / .xls – reads the ECR_Input sheet if present, otherwise the first sheet</small></p>
+    </div>
+    <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.csv" class="hidden">
+    <p class="status" id="fileStatus" aria-live="polite"></p>
+  </section>
+
+  <div id="results" class="hidden">
+    <section aria-labelledby="s-chk">
+      <h2 id="s-chk">Checks</h2>
+      <div id="notices"></div>
+      <div class="actions">
+        <button class="primary" id="dlTxt">Download ECR .txt</button>
+        <button class="ghost" id="copyTxt">Copy ECR text</button>
+        <button class="ghost" id="dlCsv">Download working sheet (.csv)</button>
+      </div>
+      <p class="status" id="actStatus" aria-live="polite"></p>
+    </section>
+
+    <section aria-labelledby="s-ch">
+      <h2 id="s-ch">Challan amounts</h2>
+      <div class="challan" id="challan"></div>
+      <p class="foot">Admin charges 0.5% of EPF wages (minimum ₹500); EDLI 0.5% of EDLI wages. The portal computes these on totals – compare with the challan it generates.</p>
+    </section>
+
+    <section aria-labelledby="s-ecr">
+      <h2 id="s-ecr">ECR text preview</h2>
+      <div class="ecr" id="ecrPreview"></div>
+      <p class="foot">Order of fields: UAN, name, gross, EPF wages, EPS wages, EDLI wages, EE share, EPS share, ER share, NCP days, refund.</p>
+    </section>
+
+    <section aria-labelledby="s-mem">
+      <h2 id="s-mem">Members</h2>
+      <div class="wrap"><table id="tbl"></table></div>
+    </section>
+  </div>
+  <footer>A personal project to help establishments prepare ECR files – not an official EPFO service. Files are processed only in your browser; nothing is uploaded. Always verify the challan generated on the Unified Portal.</footer>
+</main>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const fmt = n => Number(n).toLocaleString("en-IN");
+  const rnd = x => Math.round(x + 1e-9);
+  let raw = null, srcName = "ECR", computed = null, ecrText = "", downloads = null;
+
+  if (window.claude && typeof window.claude.use === "function") {
+    window.claude.use("downloads").then(d => { downloads = d; }).catch(() => {});
+  }
+
+  function settings(){
+    const [y,m] = ($("month").value || "2026-09").split("-").map(Number);
+    const start = Date.UTC(y, m-1, 1);
+    const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const effParts = ($("eff").value || "2026-09-17").split("-").map(Number);
+    const eff = Date.UTC(effParts[0], effParts[1]-1, effParts[2]);
+    const dOld = Math.max(0, Math.min(dim, Math.round((eff - start)/86400000)));
+    const oldC = Number($("oldc").value)||0, newC = Number($("newc").value)||0;
+    return {y, m, dim, dOld, dNew: dim - dOld, oldC, newC, ceil: rnd((oldC*dOld + newC*(dim-dOld))/dim)};
+  }
+  function showCeiling(){
+    const s = settings();
+    const mon = new Date(Date.UTC(s.y, s.m-1, 1)).toLocaleString("en-IN",{month:"long",year:"numeric",timeZone:"UTC"});
+    let t;
+    if (s.dOld === 0) t = `${mon}: full month at <b>₹${fmt(s.newC)}</b>.`;
+    else if (s.dNew === 0) t = `${mon}: full month at <b>₹${fmt(s.oldC)}</b>.`;
+    else t = `${mon}: ${s.dOld} days at ₹${fmt(s.oldC)} + ${s.dNew} days at ₹${fmt(s.newC)} → maximum PF wage <b>₹${fmt(s.ceil)}</b>.`;
+    $("ceilingLine").innerHTML = t;
+  }
+
+  // ---------- file reading ----------
+  const drop = $("drop"), fileIn = $("file");
+  drop.addEventListener("click", () => fileIn.click());
+  drop.addEventListener("keydown", e => { if (e.key==="Enter"||e.key===" "){ e.preventDefault(); fileIn.click(); }});
+  ["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => { if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
+  fileIn.addEventListener("change", () => { if (fileIn.files[0]) readFile(fileIn.files[0]); fileIn.value=""; });
+
+  function readFile(f){
+    if (typeof XLSX === "undefined"){ $("fileStatus").textContent = "The Excel reader did not load. Check the internet connection and reload the page."; return; }
+    srcName = f.name.replace(/\.[^.]+$/,"");
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const wb = XLSX.read(new Uint8Array(r.result), {type:"array"});
+        // settings sheet from template
+        const st = wb.Sheets["Settings"];
+        if (st){
+          const v = a => st[a] ? st[a].v : null;
+          if (typeof v("B5")==="number"){ const d = XLSX.SSF.parse_date_code(v("B5")); $("month").value = `${d.y}-${String(d.m).padStart(2,"0")}`; }
+          if (typeof v("B8")==="number"){ const d = XLSX.SSF.parse_date_code(v("B8")); $("eff").value = `${d.y}-${String(d.m).padStart(2,"0")}-${String(d.d).padStart(2,"0")}`; }
+          if (typeof v("B6")==="number") $("oldc").value = v("B6");
+          if (typeof v("B7")==="number") $("newc").value = v("B7");
+          if (v("B3")) srcName = String(v("B3")).trim() || srcName;
+        }
+        const sh = wb.Sheets["ECR_Input"] || wb.Sheets[wb.SheetNames[0]];
+        const aoa = XLSX.utils.sheet_to_json(sh, {header:1, raw:true, defval:""});
+        raw = parseRows(aoa);
+        $("fileStatus").textContent = `${f.name}: ${raw.members.length} members read.`;
+        showCeiling(); run();
+      } catch(err){
+        $("fileStatus").textContent = "This file could not be read as Excel: " + err.message;
+      }
+    };
+    r.readAsArrayBuffer(f);
+  }
+
+  function parseRows(aoa){
+    let hi = aoa.findIndex(row => row.some(c => /uan/i.test(String(c))));
+    if (hi < 0) throw new Error("no header row with a UAN column found");
+    const H = aoa[hi].map(h => String(h).toUpperCase().replace(/[\s_]+/g," ").trim());
+    const find = (...res) => { for (const re of res){ const i = H.findIndex(h => re.test(h)); if (i>=0) return i; } return -1; };
+    const col = {
+      uan: find(/^UAN/, /UAN/), name: find(/MEMBER NAME/, /NAME/), gross: find(/GROSS/),
+      actual: find(/ACTUAL PF/, /BASIC/, /^EPF WAGES/, /PF WAGES/),
+      epsw: find(/^EPS WAGES/), eecontri: find(/EPF CONTRI/, /CONTRI REMITTED \(EE\)/),
+      ncp: find(/NCP/), refund: find(/REFUND/),
+      epsm: find(/EPS MEMBER/), full: find(/FULL WAGE/), rem: find(/REMARK/)
+    };
+    if (col.uan<0 || col.name<0 || col.gross<0 || col.actual<0) throw new Error("need UAN, member name, gross wages and PF/EPF wages columns");
+    const isTemplate = col.epsm >= 0;
+    const members = [];
+    for (let i = hi+1; i < aoa.length; i++){
+      const row = aoa[i];
+      const uanRaw = String(row[col.uan] ?? "").trim();
+      if (!uanRaw) continue;
+      const num = v => { const n = Number(String(v).replace(/,/g,"")); return isFinite(n) ? n : 0; };
+      const uan = /e\+/i.test(uanRaw) ? Number(uanRaw).toFixed(0) : uanRaw.replace(/\.0+$/,"");
+      const gross = num(row[col.gross]), actual = num(row[col.actual]);
+      const rem = col.rem>=0 ? String(row[col.rem]).trim() : (row[11] ? String(row[11]).trim() : "");
+      let epsm, full;
+      if (isTemplate){
+        epsm = String(row[col.epsm]).trim().toUpperCase() === "N" ? "N" : "Y";
+        full = col.full>=0 && String(row[col.full]).trim().toUpperCase() === "Y" ? "Y" : "N";
+      } else {
+        epsm = (/not.*eps|above\s*58|58/i.test(rem) || (col.epsw>=0 && num(row[col.epsw])===0 && actual>0)) ? "N" : "Y";
+        const ee = col.eecontri>=0 ? num(row[col.eecontri]) : 0;
+        full = ee > rnd(Math.min(actual,15000)*0.12) + 1 ? "Y" : "N";
+      }
+      members.push({uan, name: String(row[col.name]).replace(/\s+/g," ").trim().toUpperCase(), gross, actual,
+        ncp: num(col.ncp>=0 ? row[col.ncp] : 0), refund: num(col.refund>=0 ? row[col.refund] : 0), epsm, full, rem});
+    }
+    return {members, isTemplate};
+  }
+
+  // ---------- compute ----------
+  function run(){
+    if (!raw) return;
+    const s = settings();
+    const useGross = $("useGross") ? $("useGross").checked : !raw.isTemplate;
+    const capped = raw.members.filter(m => m.actual === s.oldC && m.gross > s.oldC && m.full === "N");
+    let ok = 0, bad = [];
+    const T = {gross:0, epf:0, eps:0, edli:0, ee:0, epsC:0, er:0};
+    computed = raw.members.map((m, idx) => {
+      const restricted = useGross && m.actual === s.oldC && m.gross > s.oldC && m.full === "N";
+      const w = restricted ? m.gross : m.actual;
+      const lim = rnd(Math.min(w, s.oldC)*s.dOld/s.dim + Math.min(w, s.newC)*s.dNew/s.dim);
+      const epf = m.full === "Y" ? rnd(w) : lim;
+      const eps = m.epsm === "N" ? 0 : lim;
+      const edli = lim;
+      const ee = rnd(epf*0.12), epsC = rnd(eps*0.0833), er = ee - epsC;
+      const gross = rnd(m.gross);
+      let chk = "OK";
+      if (!/^\d{12}$/.test(m.uan)) chk = "UAN not 12 digits";
+      else if (!m.name) chk = "Name missing";
+      else if (m.ncp > s.dim) chk = "NCP days more than days in month";
+      else if (epf > gross) chk = "EPF wages more than gross";
+      if (chk === "OK") ok++; else bad.push({idx, chk, m});
+      T.gross+=gross; T.epf+=epf; T.eps+=eps; T.edli+=edli; T.ee+=ee; T.epsC+=epsC; T.er+=er;
+      const line = [m.uan, m.name, gross, epf, eps, edli, ee, epsC, er, rnd(m.ncp), rnd(m.refund)].join("#~#");
+      return {...m, w, restricted, lim, epf, eps, edli, ee, epsC, er, gross, chk, line};
+    });
+    ecrText = computed.map(c => c.line).join("\n");
+
+    // notices
+    const N = $("notices"); N.innerHTML = "";
+    if (capped.length){
+      const d = document.createElement("div"); d.className = "notice warn";
+      d.innerHTML = `${capped.length} members have PF wages of exactly ₹${fmt(s.oldC)} with higher gross – likely capped under the old ceiling. `
+        + `<label><input type="checkbox" id="useGross" ${useGross?"checked":""}> Use their gross wages as PF wages</label>`
+        + `<br><small>Untick if ₹${fmt(s.oldC)} is their real Basic+DA. For accuracy, put actual Basic+DA in the template instead.</small>`;
+      N.appendChild(d);
+      $("useGross").addEventListener("change", run);
+    }
+    const nN = computed.filter(c => c.epsm==="N").length, nF = computed.filter(c => c.full==="Y").length;
+    if (nN || nF){
+      const d = document.createElement("div"); d.className = "notice warn";
+      d.textContent = `${nN} members marked not in EPS (EPS wages 0); ${nF} members contributing on full wages above the ceiling. Check these against the establishment's records.`;
+      N.appendChild(d);
+    }
+    const d = document.createElement("div");
+    if (bad.length){
+      d.className = "notice err";
+      d.innerHTML = `${bad.length} rows need fixing before the ECR can be downloaded:<br>` +
+        bad.slice(0,12).map(b => `Row ${b.idx+1} – ${escapeHtml(b.m.name || b.m.uan)}: ${b.chk}`).join("<br>") +
+        (bad.length>12 ? `<br>…and ${bad.length-12} more (highlighted in the table below).` : "");
+    } else {
+      d.className = "notice ok";
+      d.textContent = `All ${ok} members passed the checks. The ECR file is ready.`;
+    }
+    N.appendChild(d);
+    $("dlTxt").disabled = bad.length > 0;
+    $("copyTxt").disabled = bad.length > 0;
+
+    // challan
+    const admin = computed.length ? Math.max(500, rnd(T.epf*0.005)) : 0;
+    const edliC = rnd(T.edli*0.005);
+    const ac1 = T.ee + T.er;
+    const items = [
+      ["Members", computed.length, true], ["Gross wages", T.gross], ["EPF wages", T.epf], ["EPS wages", T.eps], ["EDLI wages", T.edli],
+      ["A/c 1 – employee share", T.ee], ["A/c 1 – employer share", T.er], ["A/c 1 total", ac1],
+      ["A/c 2 – admin charges", admin], ["A/c 10 – pension", T.epsC], ["A/c 21 – EDLI", edliC], ["A/c 22 – EDLI admin", 0]
+    ];
+    $("challan").innerHTML = items.map(([k,v,plain]) => `<div><span>${k}</span><b>${plain?v:"₹"+fmt(v)}</b></div>`).join("")
+      + `<div class="total"><span>Total challan</span><b>₹${fmt(ac1+admin+T.epsC+edliC)}</b></div>`;
+
+    // preview
+    $("ecrPreview").innerHTML = computed.slice(0,40).map(c => escapeHtml(c.line).split("#~#").join("<i>#~#</i>")).join("\n")
+      + (computed.length>40 ? `\n… ${computed.length-40} more lines` : "");
+
+    // table
+    const head = ["#","UAN","Name","Gross","PF wage used","EPF wages","EPS wages","EDLI wages","EE","EPS","ER","NCP","Check"];
+    $("tbl").innerHTML = "<thead><tr>" + head.map((h,i)=>`<th class="${i<3||i===12?"l":""}">${h}</th>`).join("") + "</tr></thead><tbody>" +
+      computed.map((c,i) => `<tr class="${c.chk==="OK"?"":"bad"}"><td>${i+1}</td><td class="l">${escapeHtml(c.uan)}</td><td class="l">${escapeHtml(c.name)}</td>`
+        + `<td>${fmt(c.gross)}</td><td>${fmt(c.w)}${c.restricted?" *":""}</td><td>${fmt(c.epf)}</td><td>${fmt(c.eps)}</td><td>${fmt(c.edli)}</td>`
+        + `<td>${fmt(c.ee)}</td><td>${fmt(c.epsC)}</td><td>${fmt(c.er)}</td><td>${c.ncp}</td><td class="chk">${c.chk}</td></tr>`).join("") + "</tbody>";
+    $("results").classList.remove("hidden");
+    $("actStatus").textContent = "";
+  }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch])); }
+
+  // ---------- outputs ----------
+  function fname(ext){
+    const s = settings();
+    const mon = new Date(Date.UTC(s.y, s.m-1, 1)).toLocaleString("en-US",{month:"short",timeZone:"UTC"}).toUpperCase();
+    return `${srcName.replace(/[^\w\-]+/g,"_")}_ECR_${mon}_${s.y}.${ext}`;
+  }
+  async function save(name, data){
+    const st = $("actStatus");
+    if (downloads){
+      try { await downloads.save({filename:name, data}); st.textContent = `Saved ${name}.`; }
+      catch(e){ st.textContent = e && e.code === "declined" ? "Download cancelled." : "Download is not available here – use Copy ECR text and paste into Notepad."; }
+      return;
+    }
+    if (window.claude){ st.textContent = "Download is not available in this view – use Copy ECR text and paste into Notepad."; return; }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([data], {type:"text/plain"})); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    st.textContent = `Saved ${name}.`;
+  }
+  $("dlTxt").addEventListener("click", () => save(fname("txt"), ecrText));
+  $("dlCsv").addEventListener("click", () => {
+    const h = "UAN,MEMBER NAME,GROSS,PF WAGE USED,EPS MEMBER,FULL WAGE,EPF WAGES,EPS WAGES,EDLI WAGES,EE,EPS,ER,NCP,REFUND,CHECK,REMARKS";
+    const q = v => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g,'""')}"` : v;
+    const rows = computed.map(c => [c.uan,c.name,c.gross,c.w,c.epsm,c.full,c.epf,c.eps,c.edli,c.ee,c.epsC,c.er,c.ncp,c.refund,c.chk,c.rem].map(q).join(","));
+    save(fname("csv"), [h, ...rows].join("\n"));
+  });
+  $("copyTxt").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(ecrText); $("actStatus").textContent = `Copied ${computed.length} lines. Paste into Notepad and save as .txt.`; }
+    catch(e){ $("actStatus").textContent = "Copy was blocked by the browser – use Download ECR .txt."; }
+  });
+
+  ["month","eff","oldc","newc"].forEach(id => $(id).addEventListener("input", () => { showCeiling(); run(); }));
+  showCeiling();
+})();
+</script>
+</body>
+</html>
